@@ -1,0 +1,236 @@
+/* Shadow DOM 안에서만 적용됩니다 - 앱 전역 스타일과 서로 새어나가지 않습니다. */
+
+.wx-card {
+  background: var(--app-bg-card, #ffffff);
+  color: var(--app-text-primary, #1e1f24);
+  border-radius: 18px;
+  padding: 18px 16px 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.wx-card * {
+  box-sizing: border-box;
+}
+
+/* 헤더: ★ 지역명 ⊙ */
+.wx-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.wx-star {
+  color: var(--app-text-muted, #c1c5cb);
+  flex-shrink: 0;
+}
+
+.wx-location {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-target {
+  margin-left: auto;
+  color: var(--app-text-muted, #c1c5cb);
+  flex-shrink: 0;
+}
+
+/* 실패 안내 */
+.wx-empty {
+  text-align: center;
+  font-size: 13px;
+  color: var(--app-text-muted, #8a8f98);
+  padding: 20px 4px 4px;
+  line-height: 1.5;
+}
+
+/* 날짜 배지 */
+.wx-badge-wrap {
+  text-align: center;
+  margin-top: 14px;
+}
+
+.wx-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border: 1px solid var(--app-border, #e5e7eb);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--app-text-muted, #8a8f98);
+}
+
+/* 아이콘 + 큰 온도 숫자 */
+.wx-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 8px 0 0;
+}
+
+.wx-icon {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.wx-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.wx-temp {
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* 날씨상태 · 어제대비 */
+.wx-condition-row {
+  text-align: center;
+  font-size: 16px;
+  margin-top: 4px;
+}
+
+.wx-condition-row strong {
+  font-weight: 700;
+}
+
+.wx-diff {
+  color: var(--app-text-muted, #8a8f98);
+  margin-left: 6px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+/* 최저/최고 */
+.wx-range-row {
+  text-align: center;
+  font-size: 13px;
+  color: var(--app-text-muted, #8a8f98);
+  margin-top: 4px;
+}
+
+.wx-range-row b {
+  color: var(--app-text-primary, #1e1f24);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+.wx-sep {
+  margin: 0 8px;
+}
+
+/* 하단 통계 그리드 (체감/바람/습도/미세먼지/일출일몰) */
+.wx-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.wx-stat {
+  background: var(--app-bg-main, #f4f5f7);
+  border-radius: 10px;
+  padding: 8px 3px;
+  text-align: center;
+  min-width: 0;
+}
+
+.wx-stat-label {
+  font-size: 10.5px;
+  color: var(--app-text-muted, #8a8f98);
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-stat-value {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-stat-dust,
+.wx-stat-sun {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  font-size: 10px;
+}
+
+.wx-dust-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.wx-dust-line b {
+  font-weight: 700;
+  margin-left: 1px;
+}
+
+.wx-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* GENERAL 모드: 항목별 리스트 (기본은 숨김, JS가 필요시 노출) */
+.wx-list {
+  display: none;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wx-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 8px 10px;
+  background: var(--app-bg-main, #f4f5f7);
+  border-radius: 8px;
+}
+
+.wx-list li span:first-child {
+  color: var(--app-text-muted, #8a8f98);
+}
+
+.wx-list li span:last-child {
+  font-weight: 700;
+}
+
+@media (max-width: 340px) {
+  .wx-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .wx-temp {
+    font-size: 42px;
+  }
+  .wx-icon {
+    width: 42px;
+    height: 42px;
+  }
+}

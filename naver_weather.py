@@ -1,36 +1,32 @@
 # -*- coding: utf-8 -*-
 """
-BookOasis 홈 화면용 네이버 날씨 위젯 플러그인 (v1.5.0)
+BookOasis 홈 화면용 네이버 날씨 위젯 플러그인 (v2.0.0)
+
+v2.0.0 변경 사항 (대규모 개편):
+- 코어에 dashboard.html/dashboard.css/dashboard.js (Shadow DOM 격리 렌더링, 코어 1.1.1+)가
+  추가되어, 더 이상 화이트리스트 텍스트 렌더러의 "라벨:값" 카드 제약 없이 완전한 CSS/이미지로
+  위젯을 그릴 수 있게 되었습니다. 이에 맞춰 get_dashboard_data()가 텍스트 카드 목록
+  (item_type: metric) 대신, 원시 데이터 필드를 그대로 담은 단일 payload 하나를 반환하도록
+  바꾸고, 실제 화면은 dashboard.html/css/js가 그립니다(달/해 SVG 아이콘, 큰 숫자, 하단
+  통계 그리드 등 스크린샷과 동일한 디자인).
+- DISPLAY_MODE 설정(SMALL/GENERAL)은 유지되며, 이제 두 모드 모두 dashboard.js 내부에서
+  분기 렌더링됩니다 — SMALL은 스크린샷과 동일한 풀 비주얼 카드, GENERAL은 항목별 리스트
+  (여전히 SHOW_* 체크박스로 개별 행을 켜고 끌 수 있음).
 
 v1.5.0 변경 사항:
-- 설정에 "표시 방식(DISPLAY_MODE)"을 추가했습니다.
-  - SMALL: 카드 1개에 날씨상태·온도·최저/최고·습도·체감·바람·미세먼지·일출일몰을
-    전부 요약해서 보여줍니다. 날씨 상태에 맞는 이모지(☀️/⛅/☁️/🌧️/❄️ 등)를 붙여
-    한눈에 보기 좋게 꾸몄습니다 (코어 카드 스키마에 이미지 슬롯이 없어 이모지로 대체).
-  - GENERAL: 기존처럼 항목별로 개별 카드에 나눠 보여주며, SHOW_* 설정으로 각 카드를
-    켜고 끌 수 있는 동작은 그대로입니다.
+- 설정에 "표시 방식(DISPLAY_MODE)"을 추가했습니다 (SMALL/GENERAL).
 
 v1.4.0 변경 사항:
-- 날씨상태·현재기온·최저/최고·습도를 별도 카드로 나누지 않고 메인 카드 하나(설명란)에
-  모두 묶어서 표시하도록 변경했습니다. SHOW_RANGE/SHOW_HUMIDITY 설정은 이제 "별도 카드
-  표시 여부"가 아니라 "메인 카드 설명란에 포함할지"를 제어합니다.
-
-v1.3.0 변경 사항:
-- 최저/최고, 체감, 바람, 습도, 미세먼지, 초미세먼지, 일출, 일몰 각 카드를
-  플러그인 설정 화면에서 체크박스로 개별 표시/숨김 할 수 있도록 config_schema를
-  추가했습니다 (위치+현재기온 메인 카드는 항상 표시됩니다).
+- 날씨상태·현재기온·최저/최고·습도를 메인 카드 하나에 묶어서 표시.
 
 v1.1.0 변경 사항:
-- weather.naver.com/today 페이지가 HTML class 기반이 아니라 `var blockApiResult = {...}`
-  라는 인라인 JSON 변수에 모든 실데이터(현재기온/날씨상태/미세먼지)를 담아 내려주는 구조임을
-  반영해 파싱 로직을 JSON 파싱 방식으로 전면 교체했습니다.
-- weather.naver.com/today 는 검색 쿼리와 무관하게 세션/IP 기준 지역을 보여줄 수 있으므로,
-  이름 검색(자동완성 API, best-effort)보다 REGION_CODE(지역 고유 코드) 직접 입력을 우선
-  사용하도록 변경했습니다.
+- weather.naver.com/today 페이지의 `var blockApiResult = {...}` 인라인 JSON을 직접
+  파싱하는 방식으로 전환. REGION_CODE(지역 고유 코드) 직접 입력을 권장 방식으로 변경.
 """
 
 import json
 import re
+from datetime import datetime
 
 import requests
 
@@ -48,10 +44,10 @@ class NaverWeatherProvider(BaseMetadataProvider):
             "key": "DISPLAY_MODE",
             "label": "표시 방식",
             "type": "select",
-            "default": "general",
+            "default": "small",
             "options": [
-                {"value": "small", "label": "SMALL — 한 줄 요약형 (전체 정보를 카드 1개에, 날씨 이모지 포함)"},
-                {"value": "general", "label": "GENERAL — 항목별 개별 카드 (아래 표시/숨김 설정 적용)"},
+                {"value": "small", "label": "SMALL — 풀 비주얼 카드 (아이콘/큰 숫자, CSS로 렌더링)"},
+                {"value": "general", "label": "GENERAL — 항목별 리스트 (아래 표시/숨김 설정 적용)"},
             ],
         },
         {
@@ -74,49 +70,49 @@ class NaverWeatherProvider(BaseMetadataProvider):
         },
         {
             "key": "SHOW_RANGE",
-            "label": "메인 카드에 최저/최고 기온 포함",
+            "label": "최저/최고 기온 표시",
             "type": "checkbox",
             "default": True,
         },
         {
             "key": "SHOW_FEELS_LIKE",
-            "label": "체감온도 카드 표시",
+            "label": "체감온도 표시",
             "type": "checkbox",
             "default": True,
         },
         {
             "key": "SHOW_WIND",
-            "label": "바람(풍향/풍속) 카드 표시",
+            "label": "바람(풍향/풍속) 표시",
             "type": "checkbox",
             "default": True,
         },
         {
             "key": "SHOW_HUMIDITY",
-            "label": "메인 카드에 습도 포함",
+            "label": "습도 표시",
             "type": "checkbox",
             "default": True,
         },
         {
             "key": "SHOW_PM10",
-            "label": "미세먼지 카드 표시",
+            "label": "미세먼지 표시",
             "type": "checkbox",
             "default": True,
         },
         {
             "key": "SHOW_PM25",
-            "label": "초미세먼지 카드 표시",
+            "label": "초미세먼지 표시",
             "type": "checkbox",
             "default": True,
         },
         {
             "key": "SHOW_SUNRISE",
-            "label": "일출 카드 표시",
+            "label": "일출 표시",
             "type": "checkbox",
             "default": True,
         },
         {
             "key": "SHOW_SUNSET",
-            "label": "일몰 카드 표시",
+            "label": "일몰 표시",
             "type": "checkbox",
             "default": True,
         },
@@ -164,9 +160,9 @@ class NaverWeatherProvider(BaseMetadataProvider):
 
     def _get_config(self, db_type):
         cfg = self.get_plugin_config(db_type, default={})
-        display_mode = str(cfg.get("DISPLAY_MODE") or "general").strip().lower()
+        display_mode = str(cfg.get("DISPLAY_MODE") or "small").strip().lower()
         if display_mode not in ("small", "general"):
-            display_mode = "general"
+            display_mode = "small"
         region_code = str(cfg.get("REGION_CODE") or "").strip()
         location = str(cfg.get("LOCATION") or "서울").strip()
         try:
@@ -260,13 +256,7 @@ class NaverWeatherProvider(BaseMetadataProvider):
 
     @staticmethod
     def _weather_emoji(condition):
-        """
-        날씨 상태 텍스트(예: '맑음', '구름많음', '흐림/비')를 이모지로 매핑합니다.
-        홈 위젯 카드 스키마에는 이미지/아이콘 슬롯이 없으므로(도서 커버 전용),
-        텍스트 안에 이모지를 넣는 방식으로 "예쁘게" 표현합니다. 정확한 매칭이
-        아니라 포함 여부(substring) 기준이라 다양한 문구 변형에도 웬만큼
-        대응합니다.
-        """
+        """조건 텍스트를 이모지로 매핑 (GENERAL 모드나 폴백 표시에 사용)."""
         if not condition:
             return "🌡️"
         text = condition
@@ -295,12 +285,35 @@ class NaverWeatherProvider(BaseMetadataProvider):
 
     @staticmethod
     def _fmt_temp(value, decimals=1):
+        """섭씨 온도를 '°' 기호 포함 문자열로. 실패 시 None."""
         if value is None:
             return None
         try:
             return f"{float(value):.{decimals}f}°"
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _fmt_num(value, decimals=1):
+        """섭씨 온도를 '°' 기호 없이 숫자 문자열로만 (HTML에서 °를 별도로 붙일 때 사용)."""
+        if value is None:
+            return None
+        try:
+            return f"{float(value):.{decimals}f}"
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _is_daytime(sunrise, sunset):
+        """
+        현재 서버 시각이 일출~일몰 사이인지 판정합니다. sunrise/sunset은 'HH:MM' 문자열.
+        문자열 비교(zero-padded HH:MM)로 충분히 정확하며 별도 시간 파싱 라이브러리가
+        필요 없습니다. 값이 없으면 보수적으로 True(주간)를 반환합니다.
+        """
+        if not sunrise or not sunset:
+            return True
+        now_hm = datetime.now().strftime("%H:%M")
+        return sunrise <= now_hm < sunset
 
     def _parse_weather(self, block_api_result, location_label):
         try:
@@ -346,13 +359,13 @@ class NaverWeatherProvider(BaseMetadataProvider):
         if sun_today is None and sun_list:
             sun_today = sun_list[0]
 
+        sunrise = self._fmt_time(sun_today.get("sriseTm")) if sun_today else None
+        sunset = self._fmt_time(sun_today.get("ssetTm")) if sun_today else None
+
         wind_code = now_fcast.get("windDrctn")
-        wind_speed = now_fcast.get("windSpd")
-        wind_label = None
-        if wind_code or wind_speed is not None:
-            direction_ko = self._WIND_DIRECTION_KO.get(wind_code, wind_code or "")
-            speed_txt = f"{wind_speed}m/s" if wind_speed is not None else ""
-            wind_label = " ".join(p for p in (direction_ko, speed_txt) if p) or None
+        wind_speed_val = now_fcast.get("windSpd")
+        wind_dir = self._WIND_DIRECTION_KO.get(wind_code, wind_code) if wind_code else None
+        wind_speed = f"{wind_speed_val}m/s" if wind_speed_val is not None else None
 
         yesterday_diff = now_fcast.get("ytmpr")
         diff_label = None
@@ -370,17 +383,21 @@ class NaverWeatherProvider(BaseMetadataProvider):
         return {
             "location": location_label,
             "temperature": self._fmt_temp(temperature),
+            "temp_num": self._fmt_num(temperature),
             "condition": condition,
             "diff": diff_label,
             "min_temp": min_temp,
             "max_temp": max_temp,
             "feels_like": self._fmt_temp(now_fcast.get("stmpr")),
-            "wind": wind_label,
+            "wind_dir": wind_dir,
+            "wind_speed": wind_speed,
             "humidity": humidity_label,
             "pm10": air_fcast.get("stationPM10Legend1"),
             "pm25": air_fcast.get("stationPM25Legend1"),
-            "sunrise": self._fmt_time(sun_today.get("sriseTm")) if sun_today else None,
-            "sunset": self._fmt_time(sun_today.get("ssetTm")) if sun_today else None,
+            "sunrise": sunrise,
+            "sunset": sunset,
+            "is_daytime": self._is_daytime(sunrise, sunset),
+            "today_label": datetime.now().strftime("%m.%d"),
         }
 
     # --- 코어가 호출하는 공개 메서드 ---
@@ -417,96 +434,71 @@ class NaverWeatherProvider(BaseMetadataProvider):
                     "직접 검색한 뒤 주소창 URL의 숫자 코드를 REGION_CODE 설정에 "
                     "입력해보세요 (예: https://weather.naver.com/today/18330600 → 18330600)."
                 )
-            return {
-                "success": True,
-                "items": [
-                    {
-                        "item_type": "metric",
-                        "metric": "안내",
-                        "value": f"'{location}' 날씨 정보를 불러오지 못했습니다.",
-                        "description": hint,
-                    }
-                ],
+            payload = {
+                "location": location,
+                "error": f"'{location}' 날씨 정보를 불러오지 못했습니다. {hint}",
             }
+            return {"success": True, "items": [payload]}
 
-        if display_mode == "small":
-            items = self._build_small_items(data, visibility)
-        else:
-            items = self._build_general_items(data, visibility)
+        # dashboard.js가 그대로 소비할 payload 하나를 구성합니다. 화이트리스트 렌더러를
+        # 거치지 않고 dashboard.html/css/js가 이 구조를 직접 읽어 화면을 그립니다.
+        payload = dict(data)
+        payload["display_mode"] = display_mode
+        payload["emoji"] = self._weather_emoji(data.get("condition"))
 
-        return {"success": True, "items": items[: max(limit, 10)]}
+        if display_mode == "general":
+            payload["general_rows"] = self._build_general_rows(data, visibility)
 
-    # --- 표시 방식별 items 빌더 ---
+        # visibility에 따라 SMALL 모드에서도 항목별로 필드를 비워 dashboard.js가
+        # 자동으로 숨기도록 합니다 (값이 없으면 JS가 해당 행을 렌더링하지 않음).
+        if not visibility.get("range", True):
+            payload["min_temp"] = None
+            payload["max_temp"] = None
+        if not visibility.get("humidity", True):
+            payload["humidity"] = None
+        if not visibility.get("feels_like", True):
+            payload["feels_like"] = None
+        if not visibility.get("wind", True):
+            payload["wind_dir"] = None
+            payload["wind_speed"] = None
+        if not visibility.get("pm10", True):
+            payload["pm10"] = None
+        if not visibility.get("pm25", True):
+            payload["pm25"] = None
+        if not visibility.get("sunrise", True):
+            payload["sunrise"] = None
+        if not visibility.get("sunset", True):
+            payload["sunset"] = None
 
-    def _build_general_items(self, data, visibility):
-        """GENERAL: 항목별 개별 카드 (기존 v1.4.0 동작)."""
-        # 메인 카드 하나에 날씨상태 · 온도 · 최저/최고 · 습도를 모두 묶어서 표시합니다.
-        description_parts = [p for p in (data.get("condition"), data.get("diff")) if p]
+        return {"success": True, "items": [payload]}
+
+    def _build_general_rows(self, data, visibility):
+        """GENERAL 모드용 라벨/값 행 목록을 만듭니다 (dashboard.js가 <ul>로 렌더링)."""
+        rows = []
+        if data.get("temperature"):
+            rows.append({"label": "온도", "value": data["temperature"]})
+
+        condition_value = data.get("condition") or "정보 없음"
+        if data.get("diff"):
+            condition_value = f"{condition_value} · {data['diff']}"
+        rows.append({"label": "날씨", "value": condition_value})
+
         if visibility.get("range", True) and data.get("min_temp") and data.get("max_temp"):
-            description_parts.append(f"최저 {data['min_temp']} 최고 {data['max_temp']}")
+            rows.append({"label": "최저/최고", "value": f"{data['min_temp']} / {data['max_temp']}"})
         if visibility.get("humidity", True) and data.get("humidity"):
-            description_parts.append(f"습도 {data['humidity']}")
+            rows.append({"label": "습도", "value": data["humidity"]})
+        if visibility.get("feels_like", True) and data.get("feels_like"):
+            rows.append({"label": "체감", "value": data["feels_like"]})
+        if visibility.get("wind", True) and (data.get("wind_dir") or data.get("wind_speed")):
+            wind_value = " ".join(p for p in (data.get("wind_dir"), data.get("wind_speed")) if p)
+            rows.append({"label": "바람", "value": wind_value})
+        if visibility.get("pm10", True) and data.get("pm10"):
+            rows.append({"label": "미세먼지", "value": data["pm10"]})
+        if visibility.get("pm25", True) and data.get("pm25"):
+            rows.append({"label": "초미세먼지", "value": data["pm25"]})
+        if visibility.get("sunrise", True) and data.get("sunrise"):
+            rows.append({"label": "일출", "value": data["sunrise"]})
+        if visibility.get("sunset", True) and data.get("sunset"):
+            rows.append({"label": "일몰", "value": data["sunset"]})
 
-        items = [
-            {
-                "item_type": "metric",
-                "metric": data["location"],
-                "value": data.get("temperature") or "정보 없음",
-                "description": " · ".join(description_parts),
-            }
-        ]
-
-        # 나머지 정보(체감, 풍향/풍속, 미세/초미세, 일출/일몰)는 각각 별도 카드로 추가합니다.
-        # 값이 없거나 설정에서 꺼둔 항목은 건너뜁니다.
-        extra_fields = [
-            ("feels_like", "체감", data.get("feels_like")),
-            ("wind", "바람", data.get("wind")),
-            ("pm10", "미세먼지", data.get("pm10")),
-            ("pm25", "초미세먼지", data.get("pm25")),
-            ("sunrise", "일출", data.get("sunrise")),
-            ("sunset", "일몰", data.get("sunset")),
-        ]
-        for flag_key, label, value in extra_fields:
-            if value and visibility.get(flag_key, True):
-                items.append({"item_type": "metric", "metric": label, "value": value})
-
-        return items
-
-    def _build_small_items(self, data, visibility):
-        """
-        SMALL: 카드 1개에 모든 정보를 요약합니다. 코어 위젯 스키마에는 이미지/아이콘
-        슬롯이 없어서(도서 커버 전용), 날씨 상태에 맞는 이모지를 텍스트 안에 넣어
-        "예쁘게" 표현합니다. 표시할 항목 자체는 GENERAL과 동일한 SHOW_* 설정을
-        그대로 따릅니다 - 켜둔 항목만 요약 문장에 포함됩니다.
-        """
-        emoji = self._weather_emoji(data.get("condition"))
-        temperature = data.get("temperature") or "정보 없음"
-
-        # 온도 다음에 오는 핵심 요약 (날씨상태 · 어제대비 · 최저/최고 · 습도)
-        summary_parts = [p for p in (data.get("condition"), data.get("diff")) if p]
-        if visibility.get("range", True) and data.get("min_temp") and data.get("max_temp"):
-            summary_parts.append(f"최저 {data['min_temp']} 최고 {data['max_temp']}")
-        if visibility.get("humidity", True) and data.get("humidity"):
-            summary_parts.append(f"💧 습도 {data['humidity']}")
-
-        # 나머지 부가 정보도 이모지를 붙여 한 줄에 이어 붙입니다.
-        extra_fields = [
-            ("feels_like", "🌡️ 체감", data.get("feels_like")),
-            ("wind", "💨", data.get("wind")),
-            ("pm10", "🌫️ 미세", data.get("pm10")),
-            ("pm25", "😷 초미세", data.get("pm25")),
-            ("sunrise", "🌅 일출", data.get("sunrise")),
-            ("sunset", "🌇 일몰", data.get("sunset")),
-        ]
-        for flag_key, prefix, value in extra_fields:
-            if value and visibility.get(flag_key, True):
-                summary_parts.append(f"{prefix} {value}")
-
-        return [
-            {
-                "item_type": "metric",
-                "metric": f"{emoji} {data['location']}",
-                "value": f"{emoji} {temperature}",
-                "description": " · ".join(summary_parts),
-            }
-        ]
+        return rows

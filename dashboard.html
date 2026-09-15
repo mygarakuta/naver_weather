@@ -1,0 +1,61 @@
+<div class="wx-card">
+  <div class="wx-head">
+    <svg class="wx-star" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+      <path fill="currentColor" d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279L12 19.771l-7.416 3.642 1.48-8.279L0 9.306l8.332-1.151z"/>
+    </svg>
+    <span class="wx-location" data-f="location">지역 정보 없음</span>
+    <svg class="wx-target" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <circle cx="12" cy="12" r="2.2" fill="currentColor"/>
+    </svg>
+  </div>
+
+  <div class="wx-empty" data-f="empty" style="display:none"></div>
+
+  <div class="wx-body">
+    <div class="wx-badge-wrap">
+      <span class="wx-badge">현재 <span data-f="today">--.--</span></span>
+    </div>
+
+    <div class="wx-main">
+      <span class="wx-icon" data-f="icon"></span>
+      <span class="wx-temp"><span data-f="temperature">-</span>°</span>
+    </div>
+
+    <div class="wx-condition-row">
+      <strong data-f="condition">-</strong>
+      <span class="wx-diff" data-f="diff"></span>
+    </div>
+
+    <div class="wx-range-row" data-f="range-row">
+      <span>최저<b data-f="min_temp">-</b></span>
+      <span class="wx-sep">·</span>
+      <span>최고<b data-f="max_temp">-</b></span>
+    </div>
+
+    <div class="wx-stats">
+      <div class="wx-stat" data-f="stat-feels">
+        <div class="wx-stat-label">체감</div>
+        <div class="wx-stat-value" data-f="feels_like">-</div>
+      </div>
+      <div class="wx-stat" data-f="stat-wind">
+        <div class="wx-stat-label" data-f="wind_dir">바람</div>
+        <div class="wx-stat-value" data-f="wind_speed">-</div>
+      </div>
+      <div class="wx-stat" data-f="stat-humidity">
+        <div class="wx-stat-label">습도</div>
+        <div class="wx-stat-value" data-f="humidity">-</div>
+      </div>
+      <div class="wx-stat wx-stat-dust" data-f="stat-dust">
+        <div class="wx-dust-line"><span class="wx-dot" data-f="pm10-dot"></span>미세<b data-f="pm10">-</b></div>
+        <div class="wx-dust-line"><span class="wx-dot" data-f="pm25-dot"></span>초미세<b data-f="pm25">-</b></div>
+      </div>
+      <div class="wx-stat wx-stat-sun" data-f="stat-sun">
+        <div class="wx-dust-line">일출<b data-f="sunrise">-</b></div>
+        <div class="wx-dust-line">일몰<b data-f="sunset">-</b></div>
+      </div>
+    </div>
+
+    <ul class="wx-list" data-f="list"></ul>
+  </div>
+</div>
