@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-BookOasis 홈 화면용 네이버 날씨 위젯 플러그인 (v1.3.0)
+BookOasis 홈 화면용 네이버 날씨 위젯 플러그인 (v1.4.0)
+
+v1.4.0 변경 사항:
+- 날씨상태·현재기온·최저/최고·습도를 별도 카드로 나누지 않고 메인 카드 하나(설명란)에
+  모두 묶어서 표시하도록 변경했습니다. SHOW_RANGE/SHOW_HUMIDITY 설정은 이제 "별도 카드
+  표시 여부"가 아니라 "메인 카드 설명란에 포함할지"를 제어합니다.
 
 v1.3.0 변경 사항:
 - 최저/최고, 체감, 바람, 습도, 미세먼지, 초미세먼지, 일출, 일몰 각 카드를
@@ -51,7 +56,7 @@ class NaverWeatherProvider(BaseMetadataProvider):
         },
         {
             "key": "SHOW_RANGE",
-            "label": "최저/최고 기온 카드 표시",
+            "label": "메인 카드에 최저/최고 기온 포함",
             "type": "checkbox",
             "default": True,
         },
@@ -69,7 +74,7 @@ class NaverWeatherProvider(BaseMetadataProvider):
         },
         {
             "key": "SHOW_HUMIDITY",
-            "label": "습도 카드 표시",
+            "label": "메인 카드에 습도 포함",
             "type": "checkbox",
             "default": True,
         },
@@ -276,12 +281,11 @@ class NaverWeatherProvider(BaseMetadataProvider):
 
         # 오늘 날짜(aplYmd)와 일치하는 주간예보 항목에서 최저/최고 기온을 찾습니다.
         today_ymd = now_fcast.get("aplYmd")
-        today_range = None
+        min_temp = max_temp = None
         for day in weekly_list:
             if not today_ymd or day.get("aplYmd") == today_ymd:
-                min_t, max_t = day.get("minTmpr"), day.get("maxTmpr")
-                if min_t is not None and max_t is not None:
-                    today_range = f"{self._fmt_temp(min_t, 0)} / {self._fmt_temp(max_t, 0)}"
+                min_temp = self._fmt_temp(day.get("minTmpr"), 0)
+                max_temp = self._fmt_temp(day.get("maxTmpr"), 0)
                 break
 
         # 오늘 날짜와 일치하는 일출일몰 항목을 찾습니다 (없으면 첫 항목 사용).
@@ -319,7 +323,8 @@ class NaverWeatherProvider(BaseMetadataProvider):
             "temperature": self._fmt_temp(temperature),
             "condition": condition,
             "diff": diff_label,
-            "today_range": today_range,
+            "min_temp": min_temp,
+            "max_temp": max_temp,
             "feels_like": self._fmt_temp(now_fcast.get("stmpr")),
             "wind": wind_label,
             "humidity": humidity_label,
@@ -375,8 +380,13 @@ class NaverWeatherProvider(BaseMetadataProvider):
                 ],
             }
 
-        # 메인 카드: 위치 + 현재기온 + 날씨상태(어제 대비 포함)
+        # 메인 카드 하나에 날씨상태 · 온도 · 최저/최고 · 습도를 모두 묶어서 표시합니다.
         description_parts = [p for p in (data.get("condition"), data.get("diff")) if p]
+        if visibility.get("range", True) and data.get("min_temp") and data.get("max_temp"):
+            description_parts.append(f"최저 {data['min_temp']} 최고 {data['max_temp']}")
+        if visibility.get("humidity", True) and data.get("humidity"):
+            description_parts.append(f"습도 {data['humidity']}")
+
         items = [
             {
                 "item_type": "metric",
@@ -386,13 +396,11 @@ class NaverWeatherProvider(BaseMetadataProvider):
             }
         ]
 
-        # 스크린샷 속 나머지 정보(최저/최고, 체감, 풍향/풍속, 습도, 미세/초미세, 일출/일몰)를
-        # 각각 별도 카드로 추가합니다. 값이 없거나 설정에서 꺼둔 항목은 건너뜁니다.
+        # 나머지 정보(체감, 풍향/풍속, 미세/초미세, 일출/일몰)는 각각 별도 카드로 추가합니다.
+        # 값이 없거나 설정에서 꺼둔 항목은 건너뜁니다.
         extra_fields = [
-            ("range", "최저/최고", data.get("today_range")),
             ("feels_like", "체감", data.get("feels_like")),
             ("wind", "바람", data.get("wind")),
-            ("humidity", "습도", data.get("humidity")),
             ("pm10", "미세먼지", data.get("pm10")),
             ("pm25", "초미세먼지", data.get("pm25")),
             ("sunrise", "일출", data.get("sunrise")),
