@@ -1,6 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-BookOasis 홈 화면용 네이버 날씨 위젯 플러그인 (v1.4.0)
+BookOasis 홈 화면용 네이버 날씨 위젯 플러그인 (v1.5.0)
+
+v1.5.0 변경 사항:
+- 설정에 "표시 방식(DISPLAY_MODE)"을 추가했습니다.
+  - SMALL: 카드 1개에 날씨상태·온도·최저/최고·습도·체감·바람·미세먼지·일출일몰을
+    전부 요약해서 보여줍니다. 날씨 상태에 맞는 이모지(☀️/⛅/☁️/🌧️/❄️ 등)를 붙여
+    한눈에 보기 좋게 꾸몄습니다 (코어 카드 스키마에 이미지 슬롯이 없어 이모지로 대체).
+  - GENERAL: 기존처럼 항목별로 개별 카드에 나눠 보여주며, SHOW_* 설정으로 각 카드를
+    켜고 끌 수 있는 동작은 그대로입니다.
 
 v1.4.0 변경 사항:
 - 날씨상태·현재기온·최저/최고·습도를 별도 카드로 나누지 않고 메인 카드 하나(설명란)에
@@ -36,6 +44,16 @@ class NaverWeatherProvider(BaseMetadataProvider):
     is_searchable = False
 
     config_schema = [
+        {
+            "key": "DISPLAY_MODE",
+            "label": "표시 방식",
+            "type": "select",
+            "default": "general",
+            "options": [
+                {"value": "small", "label": "SMALL — 한 줄 요약형 (전체 정보를 카드 1개에, 날씨 이모지 포함)"},
+                {"value": "general", "label": "GENERAL — 항목별 개별 카드 (아래 표시/숨김 설정 적용)"},
+            ],
+        },
         {
             "key": "REGION_CODE",
             "label": "네이버 날씨 지역 코드 (강력 권장 - 찾는 법은 README 참고)",
@@ -146,6 +164,9 @@ class NaverWeatherProvider(BaseMetadataProvider):
 
     def _get_config(self, db_type):
         cfg = self.get_plugin_config(db_type, default={})
+        display_mode = str(cfg.get("DISPLAY_MODE") or "general").strip().lower()
+        if display_mode not in ("small", "general"):
+            display_mode = "general"
         region_code = str(cfg.get("REGION_CODE") or "").strip()
         location = str(cfg.get("LOCATION") or "서울").strip()
         try:
@@ -164,7 +185,7 @@ class NaverWeatherProvider(BaseMetadataProvider):
             "sunset": self._as_bool(cfg.get("SHOW_SUNSET")),
         }
 
-        return region_code, location, max(ttl, 60), visibility
+        return display_mode, region_code, location, max(ttl, 60), visibility
 
     # --- 지역명 -> 지역코드 변환 (best-effort, 실패해도 안전하게 None) ---
 
@@ -236,6 +257,34 @@ class NaverWeatherProvider(BaseMetadataProvider):
         "S": "남풍", "SSW": "남남서풍", "SW": "남서풍", "WSW": "서남서풍",
         "W": "서풍", "WNW": "서북서풍", "NW": "북서풍", "NNW": "북북서풍",
     }
+
+    @staticmethod
+    def _weather_emoji(condition):
+        """
+        날씨 상태 텍스트(예: '맑음', '구름많음', '흐림/비')를 이모지로 매핑합니다.
+        홈 위젯 카드 스키마에는 이미지/아이콘 슬롯이 없으므로(도서 커버 전용),
+        텍스트 안에 이모지를 넣는 방식으로 "예쁘게" 표현합니다. 정확한 매칭이
+        아니라 포함 여부(substring) 기준이라 다양한 문구 변형에도 웬만큼
+        대응합니다.
+        """
+        if not condition:
+            return "🌡️"
+        text = condition
+        if "눈" in text:
+            return "❄️"
+        if "뇌" in text or "천둥" in text:
+            return "⛈️"
+        if "비" in text or "소나기" in text:
+            return "🌧️"
+        if "구름많" in text:
+            return "⛅"
+        if "구름조금" in text:
+            return "🌤️"
+        if "흐림" in text:
+            return "☁️"
+        if "맑음" in text:
+            return "☀️"
+        return "🌡️"
 
     @staticmethod
     def _fmt_time(raw):
@@ -337,7 +386,7 @@ class NaverWeatherProvider(BaseMetadataProvider):
     # --- 코어가 호출하는 공개 메서드 ---
 
     def get_dashboard_data(self, db_type, limit=10):
-        region_code, location, ttl, visibility = self._get_config(db_type)
+        display_mode, region_code, location, ttl, visibility = self._get_config(db_type)
         cache_key = f"weather:{region_code or location}"
 
         cached = self.cache_get(cache_key)
@@ -380,6 +429,17 @@ class NaverWeatherProvider(BaseMetadataProvider):
                 ],
             }
 
+        if display_mode == "small":
+            items = self._build_small_items(data, visibility)
+        else:
+            items = self._build_general_items(data, visibility)
+
+        return {"success": True, "items": items[: max(limit, 10)]}
+
+    # --- 표시 방식별 items 빌더 ---
+
+    def _build_general_items(self, data, visibility):
+        """GENERAL: 항목별 개별 카드 (기존 v1.4.0 동작)."""
         # 메인 카드 하나에 날씨상태 · 온도 · 최저/최고 · 습도를 모두 묶어서 표시합니다.
         description_parts = [p for p in (data.get("condition"), data.get("diff")) if p]
         if visibility.get("range", True) and data.get("min_temp") and data.get("max_temp"):
@@ -410,4 +470,43 @@ class NaverWeatherProvider(BaseMetadataProvider):
             if value and visibility.get(flag_key, True):
                 items.append({"item_type": "metric", "metric": label, "value": value})
 
-        return {"success": True, "items": items[: max(limit, 10)]}
+        return items
+
+    def _build_small_items(self, data, visibility):
+        """
+        SMALL: 카드 1개에 모든 정보를 요약합니다. 코어 위젯 스키마에는 이미지/아이콘
+        슬롯이 없어서(도서 커버 전용), 날씨 상태에 맞는 이모지를 텍스트 안에 넣어
+        "예쁘게" 표현합니다. 표시할 항목 자체는 GENERAL과 동일한 SHOW_* 설정을
+        그대로 따릅니다 - 켜둔 항목만 요약 문장에 포함됩니다.
+        """
+        emoji = self._weather_emoji(data.get("condition"))
+        temperature = data.get("temperature") or "정보 없음"
+
+        # 온도 다음에 오는 핵심 요약 (날씨상태 · 어제대비 · 최저/최고 · 습도)
+        summary_parts = [p for p in (data.get("condition"), data.get("diff")) if p]
+        if visibility.get("range", True) and data.get("min_temp") and data.get("max_temp"):
+            summary_parts.append(f"최저 {data['min_temp']} 최고 {data['max_temp']}")
+        if visibility.get("humidity", True) and data.get("humidity"):
+            summary_parts.append(f"💧 습도 {data['humidity']}")
+
+        # 나머지 부가 정보도 이모지를 붙여 한 줄에 이어 붙입니다.
+        extra_fields = [
+            ("feels_like", "🌡️ 체감", data.get("feels_like")),
+            ("wind", "💨", data.get("wind")),
+            ("pm10", "🌫️ 미세", data.get("pm10")),
+            ("pm25", "😷 초미세", data.get("pm25")),
+            ("sunrise", "🌅 일출", data.get("sunrise")),
+            ("sunset", "🌇 일몰", data.get("sunset")),
+        ]
+        for flag_key, prefix, value in extra_fields:
+            if value and visibility.get(flag_key, True):
+                summary_parts.append(f"{prefix} {value}")
+
+        return [
+            {
+                "item_type": "metric",
+                "metric": f"{emoji} {data['location']}",
+                "value": f"{emoji} {temperature}",
+                "description": " · ".join(summary_parts),
+            }
+        ]
