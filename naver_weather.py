@@ -122,7 +122,6 @@ class NaverWeatherProvider(BaseMetadataProvider):
 
     home_widget = {
         "title": "오늘의 날씨",
-        "subtitle": "네이버 날씨",
         "icon": "fa-solid fa-cloud-sun",
         "order": 15,
         "limit": 10,
