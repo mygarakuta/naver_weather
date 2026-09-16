@@ -150,7 +150,7 @@
 
   if (data.display_mode === 'general') {
     // GENERAL: 풀 비주얼 블록을 감추고 항목별 리스트만 보여줍니다.
-    ['.wx-badge-wrap', '.wx-main', '.wx-condition-row', '.wx-range-row', '.wx-stats'].forEach(function (sel) {
+    ['.wx-main', '.wx-condition-row', '.wx-range-row', '.wx-stats-top', '.wx-stats-bottom'].forEach(function (sel) {
       var block = el(sel);
       if (block) block.style.display = 'none';
     });
