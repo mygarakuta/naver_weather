@@ -1,6 +1,18 @@
 /* Shadow DOM 안에서만 적용됩니다 - 앱 전역 스타일과 서로 새어나가지 않습니다. */
 
+:host {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;   /* 위젯 카드 밖으로 가로/세로 스크롤바가 생기지 않도록 */
+  box-sizing: border-box;
+}
+
 .wx-card {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 100%;
   background: var(--app-bg-card, #ffffff);
   color: var(--app-text-primary, #1e1f24);
   border-radius: 18px;
@@ -12,15 +24,17 @@
 
 .wx-card * {
   box-sizing: border-box;
+  min-width: 0;   /* flex/grid 자식이 내용 길이만큼 폭을 밀어내지 않도록 */
 }
 
-/* 헤더: ★ 지역명 ⊙ */
+/* 헤더: ★ 지역명 */
 .wx-head {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 15px;
   font-weight: 700;
+  max-width: 100%;
 }
 
 .wx-star {
@@ -31,6 +45,8 @@
 }
 
 .wx-location {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
