@@ -15,7 +15,8 @@
   max-width: 100%;
   background: var(--app-bg-card, #ffffff);
   color: var(--app-text-primary, #1e1f24);
-  border-radius: 18px;
+  border: 1px solid var(--app-border-light, #e5e7eb);
+  border-radius: 14px;
   padding: 18px 16px 14px;
   font-family: inherit;
   box-sizing: border-box;
