@@ -41,6 +41,30 @@ class NaverWeatherProvider(BaseMetadataProvider):
 
     config_schema = [
         {
+            "key": "SHOW_TAB_GENERAL",
+            "label": "[일반] 탭에 표시",
+            "type": "checkbox",
+            "default": True,
+        },
+        {
+            "key": "SHOW_TAB_ADULT",
+            "label": "[성인] 탭에 표시",
+            "type": "checkbox",
+            "default": True,
+        },
+        {
+            "key": "SHOW_TAB_AUDIOBOOK",
+            "label": "[오디오] 탭에 표시",
+            "type": "checkbox",
+            "default": True,
+        },
+        {
+            "key": "SHOW_TAB_VIDEO",
+            "label": "[영상] 탭에 표시",
+            "type": "checkbox",
+            "default": True,
+        },
+        {
             "key": "DISPLAY_MODE",
             "label": "표시 방식",
             "type": "select",
@@ -180,7 +204,14 @@ class NaverWeatherProvider(BaseMetadataProvider):
             "sunset": self._as_bool(cfg.get("SHOW_SUNSET")),
         }
 
-        return display_mode, region_code, location, max(ttl, 60), visibility
+        tab_visibility = {
+            "general": self._as_bool(cfg.get("SHOW_TAB_GENERAL")),
+            "adult": self._as_bool(cfg.get("SHOW_TAB_ADULT")),
+            "audiobook": self._as_bool(cfg.get("SHOW_TAB_AUDIOBOOK")),
+            "video": self._as_bool(cfg.get("SHOW_TAB_VIDEO")),
+        }
+
+        return display_mode, region_code, location, max(ttl, 60), visibility, tab_visibility
 
     # --- 지역명 -> 지역코드 변환 (best-effort, 실패해도 안전하게 None) ---
 
@@ -402,7 +433,18 @@ class NaverWeatherProvider(BaseMetadataProvider):
     # --- 코어가 호출하는 공개 메서드 ---
 
     def get_dashboard_data(self, db_type, limit=10):
-        display_mode, region_code, location, ttl, visibility = self._get_config(db_type)
+        display_mode, region_code, location, ttl, visibility, tab_visibility = self._get_config(db_type)
+
+        # 탭별 표시 설정이 꺼져 있으면 네이버에 요청조차 보내지 않고 바로 숨김 처리합니다.
+        tab_labels = {"general": "일반", "adult": "성인", "audiobook": "오디오", "video": "영상"}
+        if not tab_visibility.get(db_type, True):
+            label = tab_labels.get(db_type, db_type)
+            payload = {
+                "location": location,
+                "error": f"[{label}] 탭에서는 이 위젯이 꺼져 있습니다. (설정에서 다시 켤 수 있습니다)",
+            }
+            return {"success": True, "items": [payload]}
+
         cache_key = f"weather:{region_code or location}"
 
         cached = self.cache_get(cache_key)
